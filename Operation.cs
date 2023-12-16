@@ -5,6 +5,11 @@ namespace IND2
 {
     public class Operation
     {
+        public static Vector3 ReflectRay(Vector3 ray, Vector3 normal)
+        {
+            return 2 * normal * Vector3.Dot(normal, ray) - ray;
+        }
+
         public static Vector3 normal(Vector3 p0, Vector3 p1, Vector3 p2)
         {
             Vector3 v1 = p1 - p0;

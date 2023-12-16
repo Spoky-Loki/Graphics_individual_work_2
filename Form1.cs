@@ -61,12 +61,14 @@ namespace IND2
             Operation.Shift(ref cube2, new Vector3(-3f, -3f, 3f));
             Operation.ReCalcNormal(ref cube2);
 
-            Sphere sphere = new Sphere(new Vector3(0, 1, 3f), 1, Color.Yellow, 500);
+            Sphere sphere1 = new Sphere(new Vector3(3f, 1, 3f), 1, Color.Yellow, 0);
+            Sphere sphere2 = new Sphere(new Vector3(-4f, 1, 4f), 1, Color.Yellow, 0.9f);
 
             Scene.Add(room);
             Scene.Add(cube1);
             Scene.Add(cube2);
-            Scene.Add(sphere);
+            Scene.Add(sphere1);
+            Scene.Add(sphere2);
         }
 
         private void Render()
@@ -78,7 +80,7 @@ namespace IND2
                 {
                     var ray_start = CameraPosition;
                     var ray_end = CanvasToViewport(x, y);
-                    Color color = RayTrace(ray_start, ray_end);
+                    Color color = RayTrace(ray_start, ray_end, 5);
                     int xxx = W;
                     int yyy = H;
                     int xx = W / 2 + x;
@@ -94,17 +96,19 @@ namespace IND2
             return new Vector3(x * 1000/W, y * 1000/H, 300);
         }
 
-        private void ComputeCloseIntersection(Vector3 ray_start, Vector3 ray_end, ref float intersect, ref Vector3 normal, ref Color color, float min, float max)
+        private void ComputeCloseIntersection(Vector3 ray_start, Vector3 ray_end, ref float intersect, ref Vector3 normal, ref Color color, ref float reflection, float min, float max)
         {
             intersect = float.MaxValue;
             normal = new Vector3(0, 0, 0);
             color = Color.Black;
+            reflection = 0;
 
             foreach (Model model in Scene)
             {
                 float current_intersect = float.MaxValue;
                 Color current_color = Color.Black;
                 Vector3 current_normal = new Vector3(0, 0, 0);
+                float current_reflection = 0;
 
                 if (model.points == null)
                 {
@@ -119,17 +123,17 @@ namespace IND2
                         {
                             current_intersect = intersectValue1;
                             current_color = s.color;
-                            var ray_direction = Vector3.Normalize(ray_end - ray_start);
-                            Vector3 point = ray_start + current_intersect * ray_direction;
-                            current_normal = Vector3.Normalize(point - s.center) * (-1);
+                            current_reflection = s.reflection;
+                            Vector3 point = ray_start + current_intersect * ray_end;
+                            current_normal = Vector3.Normalize(point - s.center);
                         }
                         if (intersectValue2 > min && intersectValue2 < max && intersectValue2 < current_intersect)
                         {
                             current_intersect = intersectValue1;
                             current_color = s.color;
-                            var ray_direction = Vector3.Normalize(ray_end - ray_start);
-                            Vector3 point = ray_start + current_intersect * ray_direction;
-                            current_normal = Vector3.Normalize(point - s.center) * (-1);
+                            current_reflection = s.reflection;
+                            Vector3 point = ray_start + current_intersect * ray_end;
+                            current_normal = Vector3.Normalize(point - s.center);
                         }
                     }
                 }
@@ -148,6 +152,7 @@ namespace IND2
                         {
                             current_intersect = intersectValue;
                             current_color = edge.color;
+                            current_reflection = 0;
                             current_normal = edge.normal;
                         }
                     }
@@ -157,18 +162,20 @@ namespace IND2
                 {
                     intersect = current_intersect;
                     color = current_color;
+                    reflection = current_reflection;
                     normal = current_normal;
                 }
             }
         }
 
-        private Color RayTrace(Vector3 ray_start, Vector3 ray_end)
+        private Color RayTrace(Vector3 ray_start, Vector3 ray_end, int depth)
         {
             float intersect = float.MaxValue;
             Vector3 normal = new Vector3(0, 0, 0);
             Color res_color = Color.Black;
+            float reflection = 0;
 
-            ComputeCloseIntersection(ray_start, ray_end, ref intersect, ref normal, ref res_color, 0, float.MaxValue);
+            ComputeCloseIntersection(ray_start, ray_end, ref intersect, ref normal, ref res_color, ref reflection, 0, float.MaxValue);
 
             if (intersect == float.MaxValue)
                 return res_color;
@@ -177,9 +184,18 @@ namespace IND2
             Vector3 point = ray_start + intersect * ray_direction;
 
             var diffuse = ComputeLight(normal, point);
-            return Color.FromArgb((int)(res_color.R * diffuse),
+            
+            if (depth <= 0 || reflection == 0)
+                return Color.FromArgb((int)(res_color.R * diffuse),
                 (int)(res_color.G * diffuse),
                 (int)(res_color.B * diffuse));
+
+            var r = Operation.ReflectRay(-ray_end, normal);
+            Color ref_color = RayTrace(point, r, depth - 1);
+
+            return Color.FromArgb((int)(res_color.R * diffuse * (1 - reflection) + ref_color.R* reflection),
+                (int)(res_color.G * diffuse * (1 - reflection) + ref_color.G * reflection),
+                (int)(res_color.B * diffuse * (1 - reflection) + ref_color.B * reflection));
         }
 
         private double ComputeLight(Vector3 normal, Vector3 point)
@@ -191,17 +207,16 @@ namespace IND2
             float intersect = float.MaxValue;
             Vector3 norm = new Vector3(0, 0, 0);
             Color res_color = Color.Black;
+            float reflection = 0;
 
             // Тень
-            ComputeCloseIntersection(point, l, ref intersect, ref norm, ref res_color, 0.001f, 1);
+            ComputeCloseIntersection(point, l, ref intersect, ref norm, ref res_color, ref reflection, 0.001f, 1);
             if (intersect != float.MaxValue)
                 return 0.1f;
 
+            // Диффузность
             if (v > 0)
-            {
-                // Диффузность
                 result += LightIntensity * v / (normal.Length() * l.Length());
-            }
 
             return result;
         }

@@ -1,23 +1,18 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace IND2
 {
     internal class Sphere : Model
     {
         public float radius;
-        public float specular;
+        public float reflection;
 
-        public Sphere(Vector3 center, float radius, Color color, float specular) : base(center, color)
+        public Sphere(Vector3 center, float radius, Color color, float reflection) : base(center, color)
         {
             this.radius = radius;
-            this.specular = specular;
-            this.specular = specular;
+            this.reflection = reflection;
         }
 
         public static Tuple<bool, Tuple<float, float>> IntersectRaySphere(Vector3 ray_start, Vector3 ray_end, Vector3 center, float radius)
